@@ -14,7 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      stocks: {
+        Row: {
+          buying_price: number
+          created_at: string
+          id: string
+          purchase_date: string
+          quantity: number
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          buying_price: number
+          created_at?: string
+          id?: string
+          purchase_date: string
+          quantity?: number
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          buying_price?: number
+          created_at?: string
+          id?: string
+          purchase_date?: string
+          quantity?: number
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stocks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
