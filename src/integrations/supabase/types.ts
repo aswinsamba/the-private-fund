@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      price_update_log: {
+        Row: {
+          error_message: string | null
+          id: string
+          status: string
+          stocks_updated: number | null
+          update_time: string
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          status: string
+          stocks_updated?: number | null
+          update_time?: string
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          status?: string
+          stocks_updated?: number | null
+          update_time?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -29,6 +53,30 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+        }
+        Relationships: []
+      }
+      stock_prices: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          price: number
+          symbol: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          price: number
+          symbol: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          price?: number
+          symbol?: string
         }
         Relationships: []
       }

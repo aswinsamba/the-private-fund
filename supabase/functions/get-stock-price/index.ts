@@ -11,16 +11,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { symbol } = await req.json();
+    const { symbol, symbols } = await req.json();
     
-    if (!symbol) {
+    if (!symbol && (!symbols || symbols.length === 0)) {
       return new Response(
-        JSON.stringify({ error: 'Symbol is required' }),
+        JSON.stringify({ error: 'Symbol or symbols array is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const apiKey = Deno.env.get('MARKETSTACK_API_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!apiKey) {
       console.error('MARKETSTACK_API_KEY not configured');
@@ -30,38 +32,76 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch latest price from marketstack
-    const url = `http://api.marketstack.com/v1/eod/latest?access_key=${apiKey}&symbols=${symbol}.NSE`;
-    
-    console.log('Fetching stock data for:', symbol);
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error('Marketstack API error:', data);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch stock data', details: data }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+    const stockSymbols = symbols || [symbol];
+    const results = [];
+
+    for (const sym of stockSymbols) {
+      try {
+        // Check if we have a recent price in the database (today's price)
+        const today = new Date().toISOString().split('T')[0];
+        const { data: existingPrice } = await supabase
+          .from('stock_prices')
+          .select('*')
+          .eq('symbol', sym)
+          .eq('date', today)
+          .single();
+
+        if (existingPrice) {
+          console.log(`Using cached price for ${sym}`);
+          results.push({
+            symbol: sym,
+            price: parseFloat(existingPrice.price),
+            date: existingPrice.date,
+            cached: true
+          });
+          continue;
+        }
+
+        // Fetch from Marketstack API
+        const url = `http://api.marketstack.com/v1/eod/latest?access_key=${apiKey}&symbols=${sym}`;
+        console.log('Fetching stock data for:', sym);
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!response.ok || !data.data || data.data.length === 0) {
+          console.error(`Failed to fetch price for ${sym}:`, data);
+          results.push({ symbol: sym, error: 'Failed to fetch price' });
+          continue;
+        }
+
+        const stockData = data.data[0];
+        const price = stockData.close;
+        const date = stockData.date.split('T')[0];
+
+        // Store the price in database
+        await supabase
+          .from('stock_prices')
+          .upsert({
+            symbol: sym,
+            price: price,
+            date: date
+          }, { onConflict: 'symbol,date' });
+
+        results.push({
+          symbol: sym,
+          price: price,
+          date: date,
+          cached: false
+        });
+      } catch (err) {
+        console.error(`Error processing ${sym}:`, err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        results.push({ symbol: sym, error: errorMessage });
+      }
     }
 
-    if (!data.data || data.data.length === 0) {
-      console.error('No data returned for symbol:', symbol);
-      return new Response(
-        JSON.stringify({ error: 'Stock data not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const stockData = data.data[0];
+    // Return single result or array based on input
+    const responseData = symbol ? results[0] : results;
     
     return new Response(
-      JSON.stringify({
-        symbol: stockData.symbol,
-        price: stockData.close,
-        date: stockData.date
-      }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

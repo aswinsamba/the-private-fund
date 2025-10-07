@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AddStockDialog } from "@/components/AddStockDialog";
-import { StockCard } from "@/components/StockCard";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, Loader2 } from "lucide-react";
+import { LogOut, Loader2, RefreshCw } from "lucide-react";
 import { calculateXIRR } from "@/utils/xirr";
 import { useToast } from "@/hooks/use-toast";
+import { StocksTable } from "@/components/StocksTable";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Stock {
   id: string;
@@ -24,7 +25,27 @@ interface StockWithPrice extends Stock {
 const Index = () => {
   const [stocks, setStocks] = useState<StockWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const checkLastUpdate = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("price_update_log")
+        .select("*")
+        .eq("status", "success")
+        .order("update_time", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!error && data) {
+        setLastUpdate(data.update_time);
+      }
+    } catch (err) {
+      console.error("Error checking last update:", err);
+    }
+  };
 
   const fetchStocks = async () => {
     try {
@@ -35,19 +56,23 @@ const Index = () => {
 
       if (error) throw error;
 
+      // Get latest prices from database
       const stocksWithPrices = await Promise.all(
         (stocksData || []).map(async (stock) => {
           try {
-            const { data, error } = await supabase.functions.invoke("get-stock-price", {
-              body: { symbol: stock.symbol },
-            });
+            // Try to get the latest price from stock_prices table
+            const { data: priceData } = await supabase
+              .from("stock_prices")
+              .select("*")
+              .eq("symbol", stock.symbol)
+              .order("date", { ascending: false })
+              .limit(1)
+              .single();
 
-            if (error) {
-              console.error(`Error fetching price for ${stock.symbol}:`, error);
-              return { ...stock, currentPrice: null };
-            }
-
-            return { ...stock, currentPrice: data.price };
+            return { 
+              ...stock, 
+              currentPrice: priceData ? parseFloat(String(priceData.price)) : null 
+            };
           } catch (err) {
             console.error(`Error fetching price for ${stock.symbol}:`, err);
             return { ...stock, currentPrice: null };
@@ -68,8 +93,35 @@ const Index = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("update-stock-prices");
+      
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Updated ${data.stocksUpdated} stock prices`,
+      });
+
+      await fetchStocks();
+      await checkLastUpdate();
+    } catch (error) {
+      console.error("Error refreshing prices:", error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh stock prices",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     fetchStocks();
+    checkLastUpdate();
   }, []);
 
   const handleSignOut = async () => {
@@ -114,6 +166,14 @@ const Index = () => {
     return calculateXIRR(cashFlows);
   })();
 
+  const isUpdateStale = () => {
+    if (!lastUpdate) return false;
+    const updateTime = new Date(lastUpdate);
+    const now = new Date();
+    const hoursSinceUpdate = (now.getTime() - updateTime.getTime()) / (1000 * 60 * 60);
+    return hoursSinceUpdate > 24;
+  };
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background p-6">
@@ -153,16 +213,35 @@ const Index = () => {
               <AddStockDialog onStockAdded={fetchStocks} />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {stocks.map((stock) => (
-                <StockCard
-                  key={stock.id}
-                  stock={stock}
-                  currentPrice={stock.currentPrice}
-                  returns={calculateReturns(stock)}
-                  onDelete={fetchStocks}
-                />
-              ))}
+            <div className="space-y-4">
+              {isUpdateStale() && lastUpdate && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    Last successful price update was at {new Date(lastUpdate).toLocaleString('en-IN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    })}
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="flex justify-end mb-4">
+                <Button 
+                  onClick={handleRefresh} 
+                  disabled={refreshing}
+                  variant="outline"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing...' : 'Refresh Prices'}
+                </Button>
+              </div>
+              <StocksTable 
+                stocks={stocks} 
+                calculateReturns={calculateReturns}
+                onDelete={fetchStocks}
+              />
             </div>
           )}
         </div>
