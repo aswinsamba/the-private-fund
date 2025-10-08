@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      nse_symbols: {
+        Row: {
+          company_name: string
+          created_at: string
+          id: string
+          isin: string | null
+          series: string | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          company_name: string
+          created_at?: string
+          id?: string
+          isin?: string | null
+          series?: string | null
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string
+          created_at?: string
+          id?: string
+          isin?: string | null
+          series?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       price_update_log: {
         Row: {
           error_message: string | null
@@ -111,6 +141,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "stocks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlist: {
+        Row: {
+          created_at: string
+          id: string
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

@@ -34,16 +34,30 @@ Deno.serve(async (req) => {
 
     if (stocksError) throw stocksError;
 
-    const uniqueSymbols = [...new Set(stocks?.map(s => s.symbol) || [])];
-    console.log(`Updating prices for ${uniqueSymbols.length} symbols`);
+    // Get all unique symbols from the watchlist table
+    const { data: watchlist, error: watchlistError } = await supabase
+      .from('watchlist')
+      .select('symbol');
+
+    if (watchlistError) throw watchlistError;
+
+    // Combine and deduplicate symbols from both tables
+    const stockSymbols = stocks?.map(s => s.symbol) || [];
+    const watchlistSymbols = watchlist?.map(w => w.symbol) || [];
+    const uniqueSymbols = [...new Set([...stockSymbols, ...watchlistSymbols])];
+    
+    console.log(`Updating prices for ${uniqueSymbols.length} symbols (${stockSymbols.length} from portfolio, ${watchlistSymbols.length} from watchlist)`);
 
     const today = new Date().toISOString().split('T')[0];
 
     for (const symbol of uniqueSymbols) {
       try {
+        // Add .XNSE suffix for NSE stocks
+        const marketstackSymbol = `${symbol}.XNSE`;
+        
         // Fetch from Marketstack API
-        const url = `http://api.marketstack.com/v1/eod/latest?access_key=${apiKey}&symbols=${symbol}`;
-        console.log('Fetching stock data for:', symbol);
+        const url = `http://api.marketstack.com/v1/eod/latest?access_key=${apiKey}&symbols=${marketstackSymbol}`;
+        console.log('Fetching stock data for:', marketstackSymbol);
         
         const response = await fetch(url);
         const data = await response.json();

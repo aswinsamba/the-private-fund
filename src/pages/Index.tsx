@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AddStockDialog } from "@/components/AddStockDialog";
+import { AddWatchlistDialog } from "@/components/AddWatchlistDialog";
+import { WatchlistSection } from "@/components/WatchlistSection";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -22,8 +24,16 @@ interface StockWithPrice extends Stock {
   currentPrice: number | null;
 }
 
+interface WatchlistStock {
+  id: string;
+  symbol: string;
+  currentPrice: number | null;
+  company_name?: string;
+}
+
 const Index = () => {
   const [stocks, setStocks] = useState<StockWithPrice[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -93,6 +103,57 @@ const Index = () => {
     }
   };
 
+  const fetchWatchlist = async () => {
+    try {
+      const { data: watchlistData, error } = await supabase
+        .from("watchlist")
+        .select("*");
+
+      if (error) throw error;
+
+      // Get latest prices and company names
+      const watchlistWithPrices = await Promise.all(
+        (watchlistData || []).map(async (item) => {
+          try {
+            // Get price
+            const { data: priceData } = await supabase
+              .from("stock_prices")
+              .select("*")
+              .eq("symbol", item.symbol)
+              .order("date", { ascending: false })
+              .limit(1)
+              .single();
+
+            // Get company name
+            const { data: symbolData } = await supabase
+              .from("nse_symbols")
+              .select("company_name")
+              .eq("symbol", item.symbol)
+              .single();
+
+            return {
+              ...item,
+              currentPrice: priceData ? parseFloat(String(priceData.price)) : null,
+              company_name: symbolData?.company_name,
+            };
+          } catch (err) {
+            console.error(`Error fetching data for ${item.symbol}:`, err);
+            return { ...item, currentPrice: null };
+          }
+        })
+      );
+
+      setWatchlist(watchlistWithPrices);
+    } catch (error) {
+      console.error("Error fetching watchlist:", error);
+    }
+  };
+
+  const handleDataRefresh = () => {
+    fetchStocks();
+    fetchWatchlist();
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -105,7 +166,7 @@ const Index = () => {
         description: `Updated ${data.stocksUpdated} stock prices`,
       });
 
-      await fetchStocks();
+      await handleDataRefresh();
       await checkLastUpdate();
     } catch (error) {
       console.error("Error refreshing prices:", error);
@@ -120,7 +181,7 @@ const Index = () => {
   };
 
   useEffect(() => {
-    fetchStocks();
+    handleDataRefresh();
     checkLastUpdate();
   }, []);
 
@@ -186,7 +247,7 @@ const Index = () => {
               <p className="text-muted-foreground mt-2">Your Personal Stock Portfolio</p>
             </div>
             <div className="flex gap-3">
-              <AddStockDialog onStockAdded={fetchStocks} />
+              <AddStockDialog onStockAdded={handleDataRefresh} />
               <Button variant="outline" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -210,7 +271,7 @@ const Index = () => {
               <p className="text-muted-foreground text-lg mb-4">
                 No stocks in your portfolio yet
               </p>
-              <AddStockDialog onStockAdded={fetchStocks} />
+              <AddStockDialog onStockAdded={handleDataRefresh} />
             </div>
           ) : (
             <div className="space-y-4">
@@ -240,10 +301,17 @@ const Index = () => {
               <StocksTable 
                 stocks={stocks} 
                 calculateReturns={calculateReturns}
-                onDelete={fetchStocks}
+                onDelete={handleDataRefresh}
+              />
+              
+              <WatchlistSection 
+                watchlist={watchlist}
+                onRefresh={fetchWatchlist}
               />
             </div>
           )}
+          
+          <AddWatchlistDialog onStockAdded={fetchWatchlist} />
         </div>
       </div>
     </AuthGuard>

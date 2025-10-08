@@ -1,29 +1,30 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Plus } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+interface AddWatchlistDialogProps {
+  onStockAdded: () => void;
+}
 
 interface NseSymbol {
   symbol: string;
   company_name: string;
 }
 
-export const AddStockDialog = ({ onStockAdded }: { onStockAdded: () => void }) => {
+export const AddWatchlistDialog = ({ onStockAdded }: AddWatchlistDialogProps) => {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState<NseSymbol | null>(null);
   const [nseSymbols, setNseSymbols] = useState<NseSymbol[]>([]);
   const [comboboxOpen, setComboboxOpen] = useState(false);
-  const [buyingPrice, setBuyingPrice] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,70 +56,70 @@ export const AddStockDialog = ({ onStockAdded }: { onStockAdded: () => void }) =
       });
       return;
     }
-    
+
     setLoading(true);
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "You must be logged in to add stocks",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { error } = await supabase.from("stocks").insert({
-        user_id: user.id,
-        symbol: selectedSymbol.symbol,
-        buying_price: parseFloat(buyingPrice),
-        purchase_date: purchaseDate,
-        quantity: parseFloat(quantity),
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Stock added successfully",
-      });
-
-      setOpen(false);
-      setSelectedSymbol(null);
-      setSearchQuery("");
-      setBuyingPrice("");
-      setPurchaseDate("");
-      setQuantity("1");
-      onStockAdded();
-    } catch (error) {
-      console.error("Error adding stock:", error);
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
       toast({
         title: "Error",
-        description: "Failed to add stock",
+        description: "You must be logged in to add to watchlist",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const { error } = await supabase
+      .from('watchlist')
+      .insert({
+        user_id: user.id,
+        symbol: selectedSymbol.symbol,
+      });
+
+    if (error) {
+      if (error.code === '23505') { // Unique constraint violation
+        toast({
+          title: "Already in watchlist",
+          description: "This stock is already in your watchlist",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add stock to watchlist",
+          variant: "destructive",
+        });
+      }
+    } else {
+      toast({
+        title: "Success",
+        description: "Stock added to watchlist",
+      });
+      setSelectedSymbol(null);
+      setSearchQuery("");
+      setOpen(false);
+      onStockAdded();
+    }
+
+    setLoading(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Stock
+        <Button size="icon" className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg">
+          <Plus className="h-6 w-6" />
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Stock</DialogTitle>
+          <DialogTitle>Add to Watchlist</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="symbol">Stock Symbol (NSE)</Label>
+            <Label htmlFor="symbol">Stock Symbol</Label>
             <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -162,42 +163,8 @@ export const AddStockDialog = ({ onStockAdded }: { onStockAdded: () => void }) =
               </PopoverContent>
             </Popover>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              type="number"
-              step="0.01"
-              placeholder="1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="buyingPrice">Buying Price (₹)</Label>
-            <Input
-              id="buyingPrice"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={buyingPrice}
-              onChange={(e) => setBuyingPrice(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchaseDate">Purchase Date</Label>
-            <Input
-              id="purchaseDate"
-              type="date"
-              value={purchaseDate}
-              onChange={(e) => setPurchaseDate(e.target.value)}
-              required
-            />
-          </div>
           <Button type="submit" className="w-full" disabled={loading || !selectedSymbol}>
-            {loading ? "Adding..." : "Add Stock"}
+            {loading ? "Adding..." : "Add to Watchlist"}
           </Button>
         </form>
       </DialogContent>
