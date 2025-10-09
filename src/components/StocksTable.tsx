@@ -8,9 +8,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, ArrowUpDown } from "lucide-react";
+import { Trash2, ArrowUpDown, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { SellConfirmDialog } from "./SellConfirmDialog";
 
 interface Stock {
   id: string;
@@ -33,6 +34,8 @@ type SortDirection = "asc" | "desc";
 export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableProps) => {
   const [sortField, setSortField] = useState<SortField>("purchase_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sellDialogOpen, setSellDialogOpen] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const { toast } = useToast();
 
   const handleSort = (field: SortField) => {
@@ -123,8 +126,9 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableP
   );
 
   return (
-    <div className="rounded-md border bg-card">
-      <Table>
+    <>
+      <div className="rounded-md border bg-card">
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead>
@@ -177,7 +181,17 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableP
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedStock(stock);
+                      setSellDialogOpen(true);
+                    }}
+                  >
+                    Sell
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -192,5 +206,14 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableP
         </TableBody>
       </Table>
     </div>
+    
+    {selectedStock && (
+      <SellConfirmDialog
+        open={sellDialogOpen}
+        onOpenChange={setSellDialogOpen}
+        stock={selectedStock}
+      />
+    )}
+    </>
   );
 };

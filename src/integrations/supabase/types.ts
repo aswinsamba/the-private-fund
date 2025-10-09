@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      authorized_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nse_symbols: {
         Row: {
           company_name: string
@@ -86,27 +107,65 @@ export type Database = {
         }
         Relationships: []
       }
+      sell_requests: {
+        Row: {
+          id: string
+          requested_at: string
+          requested_by_email: string
+          status: string
+          stock_id: string
+        }
+        Insert: {
+          id?: string
+          requested_at?: string
+          requested_by_email: string
+          status?: string
+          stock_id: string
+        }
+        Update: {
+          id?: string
+          requested_at?: string
+          requested_by_email?: string
+          status?: string
+          stock_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sell_requests_stock_id_fkey"
+            columns: ["stock_id"]
+            isOneToOne: false
+            referencedRelation: "stocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_prices: {
         Row: {
           created_at: string
           date: string
           id: string
           price: number
+          price_valid: boolean | null
           symbol: string
+          validation_note: string | null
         }
         Insert: {
           created_at?: string
           date: string
           id?: string
           price: number
+          price_valid?: boolean | null
           symbol: string
+          validation_note?: string | null
         }
         Update: {
           created_at?: string
           date?: string
           id?: string
           price?: number
+          price_valid?: boolean | null
           symbol?: string
+          validation_note?: string | null
         }
         Relationships: []
       }
@@ -147,6 +206,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      suggestions: {
+        Row: {
+          id: string
+          suggested_at: string
+          suggested_by_email: string
+          suggestion_text: string
+        }
+        Insert: {
+          id?: string
+          suggested_at?: string
+          suggested_by_email: string
+          suggestion_text: string
+        }
+        Update: {
+          id?: string
+          suggested_at?: string
+          suggested_by_email?: string
+          suggestion_text?: string
+        }
+        Relationships: []
       }
       watchlist: {
         Row: {

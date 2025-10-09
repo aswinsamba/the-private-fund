@@ -11,6 +11,7 @@ import { calculateXIRR } from "@/utils/xirr";
 import { useToast } from "@/hooks/use-toast";
 import { StocksTable } from "@/components/StocksTable";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SuggestStockDialog } from "@/components/SuggestStockDialog";
 
 interface Stock {
   id: string;
@@ -303,6 +304,10 @@ const Index = () => {
                 calculateReturns={calculateReturns}
                 onDelete={handleDataRefresh}
               />
+              
+              <div className="mt-4">
+                <SuggestStockDialog />
+              </div>
               
               <WatchlistSection 
                 watchlist={watchlist}

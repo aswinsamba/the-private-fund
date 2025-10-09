@@ -1,10 +1,16 @@
 project_id = "qbbisdfhgrfwpdgheghe"
 
+[functions.get-stock-price]
+verify_jwt = false
+
 [functions.sync-nse-symbols]
 verify_jwt = false
 
 [functions.update-stock-prices]
 verify_jwt = false
 
-[functions.get-stock-price]
+[functions.send-sell-request]
+verify_jwt = false
+
+[functions.send-suggestion]
 verify_jwt = false
