@@ -15,9 +15,10 @@ interface WatchlistStock {
 interface WatchlistSectionProps {
   watchlist: WatchlistStock[];
   onRefresh: () => void;
+  userRole?: string | null;
 }
 
-export const WatchlistSection = ({ watchlist, onRefresh }: WatchlistSectionProps) => {
+export const WatchlistSection = ({ watchlist, onRefresh, userRole }: WatchlistSectionProps) => {
   const { toast } = useToast();
 
   const handleDelete = async (id: string, symbol: string) => {
@@ -77,13 +78,15 @@ export const WatchlistSection = ({ watchlist, onRefresh }: WatchlistSectionProps
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(stock.id, stock.symbol)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {userRole === 'wealth_manager' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(stock.id, stock.symbol)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

@@ -183,16 +183,18 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete, userRole }: St
                   </div>
                 </TableCell>
                 <TableCell className="text-right space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedStock(stock);
-                      setSellDialogOpen(true);
-                    }}
-                  >
-                    Sell
-                  </Button>
+                  {userRole === 'wealth_manager' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedStock(stock);
+                        setSellDialogOpen(true);
+                      }}
+                    >
+                      Ask to Sell
+                    </Button>
+                  )}
                   {userRole === 'owner' && (
                     <Button
                       variant="ghost"

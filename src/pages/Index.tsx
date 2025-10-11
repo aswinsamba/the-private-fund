@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { StocksTable } from "@/components/StocksTable";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SuggestStockDialog } from "@/components/SuggestStockDialog";
+import { UserSelector } from "@/components/UserSelector";
 
 interface Stock {
   id: string;
@@ -39,6 +40,8 @@ const Index = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const checkLastUpdate = async () => {
@@ -59,11 +62,15 @@ const Index = () => {
     }
   };
 
-  const fetchStocks = async () => {
+  const fetchStocks = async (userId?: string) => {
     try {
+      const targetUserId = userId || selectedUserId || currentUserId;
+      if (!targetUserId) return;
+
       const { data: stocksData, error } = await supabase
         .from("stocks")
         .select("*")
+        .eq("user_id", targetUserId)
         .order("purchase_date", { ascending: false });
 
       if (error) throw error;
@@ -105,11 +112,15 @@ const Index = () => {
     }
   };
 
-  const fetchWatchlist = async () => {
+  const fetchWatchlist = async (userId?: string) => {
     try {
+      const targetUserId = userId || selectedUserId || currentUserId;
+      if (!targetUserId) return;
+
       const { data: watchlistData, error } = await supabase
         .from("watchlist")
-        .select("*");
+        .select("*")
+        .eq("user_id", targetUserId);
 
       if (error) throw error;
 
@@ -152,8 +163,8 @@ const Index = () => {
   };
 
   const handleDataRefresh = () => {
-    fetchStocks();
-    fetchWatchlist();
+    fetchStocks(selectedUserId || undefined);
+    fetchWatchlist(selectedUserId || undefined);
   };
 
   const handleRefresh = async () => {
@@ -186,19 +197,30 @@ const Index = () => {
     const fetchUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setCurrentUserId(user.id);
         const { data } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", user.id)
           .single();
         setUserRole(data?.role || null);
+        
+        // For owners, set themselves as selected user
+        if (data?.role === 'owner') {
+          setSelectedUserId(user.id);
+        }
       }
     };
 
     fetchUserRole();
-    handleDataRefresh();
     checkLastUpdate();
   }, []);
+
+  useEffect(() => {
+    if (selectedUserId) {
+      handleDataRefresh();
+    }
+  }, [selectedUserId]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -270,6 +292,13 @@ const Index = () => {
             </div>
           </div>
 
+          {userRole === 'wealth_manager' && (
+            <UserSelector 
+              onUserSelect={setSelectedUserId}
+              selectedUserId={selectedUserId}
+            />
+          )}
+
           <PortfolioSummary
             totalInvested={totalInvested}
             currentValue={currentValue}
@@ -320,18 +349,23 @@ const Index = () => {
                 userRole={userRole}
               />
               
-              <div className="mt-4">
-                <SuggestStockDialog />
-              </div>
+              {userRole === 'wealth_manager' && (
+                <div className="mt-4">
+                  <SuggestStockDialog />
+                </div>
+              )}
               
               <WatchlistSection 
                 watchlist={watchlist}
-                onRefresh={fetchWatchlist}
+                onRefresh={() => fetchWatchlist(selectedUserId || undefined)}
+                userRole={userRole}
               />
             </div>
           )}
           
-          <AddWatchlistDialog onStockAdded={fetchWatchlist} />
+          {userRole === 'wealth_manager' && (
+            <AddWatchlistDialog onStockAdded={() => fetchWatchlist(selectedUserId || undefined)} />
+          )}
         </div>
       </div>
     </AuthGuard>
