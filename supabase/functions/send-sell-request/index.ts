@@ -1,17 +1,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface SellRequestBody {
-  stockId: string;
-  symbol: string;
-  quantity: number;
-  requestedByEmail: string;
-}
+const sellRequestSchema = z.object({
+  stockId: z.string().uuid(),
+  symbol: z.string().min(1).max(20).regex(/^[A-Z0-9]+$/),
+  quantity: z.number().positive().int().max(1000000),
+  requestedByEmail: z.string().email().max(255),
+});
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -29,7 +30,21 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
 
-    const { stockId, symbol, quantity, requestedByEmail }: SellRequestBody = await req.json();
+    const requestBody = await req.json();
+    
+    // Validate input
+    const validationResult = sellRequestSchema.safeParse(requestBody);
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input data" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    const { stockId, symbol, quantity, requestedByEmail } = validationResult.data;
 
     console.log("Processing sell request:", { stockId, symbol, quantity, requestedByEmail });
 
@@ -43,7 +58,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (dbError) {
       console.error("Database error:", dbError);
-      throw dbError;
+      return new Response(
+        JSON.stringify({ error: "Failed to record sell request" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
     // Send email using Resend API
@@ -78,7 +99,14 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (!emailResponse.ok) {
-      throw new Error(`Email API error: ${await emailResponse.text()}`);
+      console.error("Email API error:", await emailResponse.text());
+      return new Response(
+        JSON.stringify({ error: "Failed to send email notification" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
     console.log("Email sent successfully");
@@ -93,7 +121,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-sell-request function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "An unexpected error occurred" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
