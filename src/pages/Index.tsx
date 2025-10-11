@@ -42,6 +42,8 @@ const Index = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [monthlyRefreshCount, setMonthlyRefreshCount] = useState(0);
+  const [priceValidation, setPriceValidation] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const checkLastUpdate = async () => {
@@ -167,7 +169,55 @@ const Index = () => {
     fetchWatchlist(selectedUserId || undefined);
   };
 
+  const checkMonthlyRefreshCount = async () => {
+    try {
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      
+      const { data } = await supabase
+        .from('monthly_refresh_counts')
+        .select('refresh_count')
+        .eq('month_year', monthYear)
+        .maybeSingle();
+      
+      setMonthlyRefreshCount(data?.refresh_count || 0);
+    } catch (error) {
+      console.error('Error checking refresh count:', error);
+    }
+  };
+
+  const validatePrices = async () => {
+    try {
+      const symbols = stocks.map(s => s.symbol);
+      if (symbols.length === 0) return;
+
+      const { data } = await supabase.functions.invoke('validate-stock-prices', {
+        body: { symbols }
+      });
+
+      if (data?.validationResults) {
+        const validationMap: Record<string, boolean> = {};
+        data.validationResults.forEach((result: any) => {
+          validationMap[result.symbol] = result.hasDiscrepancy;
+        });
+        setPriceValidation(validationMap);
+      }
+    } catch (error) {
+      console.error('Error validating prices:', error);
+    }
+  };
+
   const handleRefresh = async () => {
+    // Check if user can refresh
+    if (monthlyRefreshCount >= 40 && userRole !== 'owner') {
+      toast({
+        title: "Limit Reached",
+        description: "Monthly refresh limit of 40 has been reached. Only owners can refresh now.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setRefreshing(true);
     try {
       const { data, error } = await supabase.functions.invoke("update-stock-prices");
@@ -181,6 +231,8 @@ const Index = () => {
 
       await handleDataRefresh();
       await checkLastUpdate();
+      await checkMonthlyRefreshCount();
+      await validatePrices();
     } catch (error) {
       console.error("Error refreshing prices:", error);
       toast({
@@ -214,6 +266,7 @@ const Index = () => {
 
     fetchUserRole();
     checkLastUpdate();
+    checkMonthlyRefreshCount();
   }, []);
 
   useEffect(() => {
@@ -221,6 +274,12 @@ const Index = () => {
       handleDataRefresh();
     }
   }, [selectedUserId]);
+
+  useEffect(() => {
+    if (stocks.length > 0) {
+      validatePrices();
+    }
+  }, [stocks]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -332,10 +391,15 @@ const Index = () => {
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="flex justify-end mb-4">
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Monthly refreshes: {monthlyRefreshCount}/40
+                  {monthlyRefreshCount >= 40 && userRole !== 'owner' && 
+                    " (Limit reached - Owner only)"}
+                </p>
                 <Button 
                   onClick={handleRefresh} 
-                  disabled={refreshing}
+                  disabled={refreshing || (monthlyRefreshCount >= 40 && userRole !== 'owner')}
                   variant="outline"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
@@ -347,6 +411,7 @@ const Index = () => {
                 calculateReturns={calculateReturns}
                 onDelete={handleDataRefresh}
                 userRole={userRole}
+                priceValidation={priceValidation}
               />
               
               {userRole === 'wealth_manager' && (

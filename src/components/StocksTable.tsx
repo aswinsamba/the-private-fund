@@ -27,12 +27,13 @@ interface StocksTableProps {
   calculateReturns: (stock: Stock) => { absolute: number; percentage: number };
   onDelete: () => void;
   userRole?: string | null;
+  priceValidation?: Record<string, boolean>;
 }
 
 type SortField = "symbol" | "quantity" | "buying_price" | "purchase_date" | "currentValue" | "returns";
 type SortDirection = "asc" | "desc";
 
-export const StocksTable = ({ stocks, calculateReturns, onDelete, userRole }: StocksTableProps) => {
+export const StocksTable = ({ stocks, calculateReturns, onDelete, userRole, priceValidation = {} }: StocksTableProps) => {
   const [sortField, setSortField] = useState<SortField>("purchase_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
@@ -162,7 +163,14 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete, userRole }: St
 
             return (
               <TableRow key={stock.id}>
-                <TableCell className="font-medium">{stock.symbol}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {priceValidation[stock.symbol] && (
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    )}
+                    {stock.symbol}
+                  </div>
+                </TableCell>
                 <TableCell>{stock.quantity}</TableCell>
                 <TableCell>₹{stock.buying_price.toFixed(2)}</TableCell>
                 <TableCell>

@@ -27,6 +27,30 @@ Deno.serve(async (req) => {
   let errorMessage = null;
 
   try {
+    // Track monthly refresh count
+    const now = new Date();
+    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Get or create current month's refresh count
+    const { data: countData } = await supabase
+      .from('monthly_refresh_counts')
+      .select('*')
+      .eq('month_year', monthYear)
+      .maybeSingle();
+
+    const currentCount = countData?.refresh_count || 0;
+
+    // Increment the count
+    const newCount = currentCount + 1;
+    await supabase
+      .from('monthly_refresh_counts')
+      .upsert({ 
+        month_year: monthYear, 
+        refresh_count: newCount 
+      }, {
+        onConflict: 'month_year'
+      });
+
     // Get all unique stock symbols from the stocks table
     const { data: stocks, error: stocksError } = await supabase
       .from('stocks')

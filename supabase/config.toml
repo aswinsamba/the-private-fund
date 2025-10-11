@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.send-suggestion]
 verify_jwt = true
+
+[functions.validate-stock-prices]
+verify_jwt = true

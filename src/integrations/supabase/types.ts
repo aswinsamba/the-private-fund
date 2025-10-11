@@ -35,6 +35,30 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_refresh_counts: {
+        Row: {
+          created_at: string
+          id: string
+          month_year: string
+          refresh_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month_year: string
+          refresh_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month_year?: string
+          refresh_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nse_symbols: {
         Row: {
           company_name: string
