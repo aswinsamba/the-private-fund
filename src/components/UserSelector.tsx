@@ -27,17 +27,39 @@ export const UserSelector = ({ onUserSelect, selectedUserId }: UserSelectorProps
       setLoading(true);
       console.log("Fetching owners for user selector...");
       
-      const { data, error } = await supabase
+      // First get user_roles with role='owner'
+      const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
-        .select("user_id, profiles!inner(email)")
+        .select("user_id")
         .eq("role", "owner");
 
-      console.log("User selector query result:", { data, error });
+      console.log("Roles query result:", { rolesData, rolesError });
 
-      if (!error && data) {
-        const owners = data.map((item: any) => ({
-          id: item.user_id,
-          email: item.profiles.email,
+      if (rolesError) {
+        console.error("Error fetching owner roles:", rolesError);
+        setLoading(false);
+        return;
+      }
+
+      if (!rolesData || rolesData.length === 0) {
+        console.log("No owners found");
+        setLoading(false);
+        return;
+      }
+
+      // Then get profiles for those user_ids
+      const userIds = rolesData.map(r => r.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", userIds);
+
+      console.log("Profiles query result:", { profilesData, profilesError });
+
+      if (!profilesError && profilesData) {
+        const owners = profilesData.map((profile: any) => ({
+          id: profile.id,
+          email: profile.email,
         }));
         console.log("Mapped owners:", owners);
         setUsers(owners);
@@ -46,8 +68,8 @@ export const UserSelector = ({ onUserSelect, selectedUserId }: UserSelectorProps
         if (owners.length > 0 && !selectedUserId) {
           onUserSelect(owners[0].id);
         }
-      } else if (error) {
-        console.error("Error fetching owners:", error);
+      } else if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
       }
       
       setLoading(false);
