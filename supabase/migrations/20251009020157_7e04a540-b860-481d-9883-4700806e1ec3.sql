@@ -32,6 +32,7 @@ EXECUTE FUNCTION public.update_updated_at_column();
 INSERT INTO public.authorized_users (email) VALUES
   ('aswins@gmail.com'),
   ('surotham@gmail.com'),
+('aswinspart2@gmail.com'),  
   ('sureshcs.thehindu@gmail.com');
 
 -- Add price_validation column to stock_prices table
