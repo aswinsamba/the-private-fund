@@ -38,6 +38,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const { toast } = useToast();
 
   const checkLastUpdate = async () => {
@@ -182,6 +183,19 @@ const Index = () => {
   };
 
   useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .single();
+        setUserRole(data?.role || null);
+      }
+    };
+
+    fetchUserRole();
     handleDataRefresh();
     checkLastUpdate();
   }, []);
@@ -248,7 +262,7 @@ const Index = () => {
               <p className="text-muted-foreground mt-2">Your Personal Stock Portfolio</p>
             </div>
             <div className="flex gap-3">
-              <AddStockDialog onStockAdded={handleDataRefresh} />
+              {userRole === 'owner' && <AddStockDialog onStockAdded={handleDataRefresh} />}
               <Button variant="outline" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -303,6 +317,7 @@ const Index = () => {
                 stocks={stocks} 
                 calculateReturns={calculateReturns}
                 onDelete={handleDataRefresh}
+                userRole={userRole}
               />
               
               <div className="mt-4">

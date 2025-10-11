@@ -26,12 +26,13 @@ interface StocksTableProps {
   stocks: Stock[];
   calculateReturns: (stock: Stock) => { absolute: number; percentage: number };
   onDelete: () => void;
+  userRole?: string | null;
 }
 
 type SortField = "symbol" | "quantity" | "buying_price" | "purchase_date" | "currentValue" | "returns";
 type SortDirection = "asc" | "desc";
 
-export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableProps) => {
+export const StocksTable = ({ stocks, calculateReturns, onDelete, userRole }: StocksTableProps) => {
   const [sortField, setSortField] = useState<SortField>("purchase_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
@@ -47,7 +48,7 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableP
     }
   };
 
-  const handleDelete = async (id: string, symbol: string) => {
+  const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase.from("stocks").delete().eq("id", id);
 
@@ -55,7 +56,7 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableP
 
       toast({
         title: "Success",
-        description: `${symbol} removed from portfolio`,
+        description: "Stock removed from portfolio",
       });
 
       onDelete();
@@ -192,13 +193,16 @@ export const StocksTable = ({ stocks, calculateReturns, onDelete }: StocksTableP
                   >
                     Sell
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(stock.id, stock.symbol)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {userRole === 'owner' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(stock.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             );
